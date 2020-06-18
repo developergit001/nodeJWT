@@ -1,0 +1,52 @@
+image: registry.gitlab.com/companyname-it/infra/gitlab-runner-demo:19.03.5
+
+services:
+  - docker:18.09-dind
+
+before_script:
+  - docker login -u $CI_REGISTRY_USER -p $CI_JOB_TOKEN $CI_REGISTRY
+
+stages:
+  - build
+  - deployment
+
+variables:
+  DOCKER_HOST: tcp://localhost:2375
+  DOCKER_DRIVER: overlay2
+  IMG_NAME: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
+
+build-production:
+
+  stage: build
+  only:
+     - /^(v|PROD-).*$/
+  script:
+    - docker build -t $IMG_NAME .
+    - docker push $IMG_NAME
+  tags:
+    - build
+
+build-development:
+
+  stage: build
+  only:
+     - /^DEV-.*$/
+  script:
+    - docker build -t $IMG_NAME .
+    - docker push $IMG_NAME
+  tags:
+    - build
+deployment-dev:
+  stage: deployment
+  only:
+     - /^(v|DEV-).*$/
+  script:
+    - kubetpl render deploy/deploy.template.yml -i deploy/env/dev.env -s IMG_NAME=$IMG_NAME -s ENVIRONMENT=development --syntax=$ -o deploy.dev.yaml
+    - kubectl apply -f deploy.dev.yaml
+  artifacts:
+    expire_in: 6 mos
+    paths:
+      - deploy.dev.yaml
+  tags:
+    - development
+

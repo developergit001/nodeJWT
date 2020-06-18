@@ -1,0 +1,123 @@
+#
+# Public access to $APPNAME API to be accessed from www.companyname.com main site.
+#
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: $APPNAME
+  namespace: frontend
+  annotations:
+    kubernetes.io/ingress.class: "$INGRESSCLASS"
+    kubernetes.io/tls-acme: "true"
+
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /
+
+    # These limits are per IP, so if customer are inside a network, multiple clients can use same IP
+#    nginx.ingress.kubernetes.io/limit-connections: 5
+#    nginx.ingress.kubernetes.io/limit-rps: 20
+
+    # CORS should be enabled after upgrade to version 0.12.x of nginx-controller
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "$CORS_ALLOW_ORIGIN"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, DELETE"
+
+    companyname.family.$APPNAME: api
+spec:
+  rules:
+  - host: $APPNAME.$ENVIRONMENT.companyname.com
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: $APPNAME
+          servicePort: http
+  tls:
+    - hosts:
+      - $APPNAME.$ENVIRONMENT.companyname.com
+      secretName: $ENVIRONMENT-companyname-com-tls
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: $APPNAME
+  namespace: frontend
+spec:
+  ports:
+  - name: http
+    port: 3000
+    protocol: TCP
+    targetPort: http
+
+  selector:
+    "k8s-app": "$APPNAME"
+    "role": "api"
+  sessionAffinity: None
+  type: ClusterIP
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    app.$APPNAME: api
+  labels:
+    k8s-app: "$APPNAME"
+    role: "api"
+  name: $APPNAME
+  namespace: frontend
+spec:
+  minReadySeconds: 10
+  replicas: $REPLICAS
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      k8s-app: "$APPNAME"
+      role: "api"
+  strategy:
+    rollingUpdate:
+      maxSurge: 100%
+      maxUnavailable: 100%
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        app.micuenta: ui
+      labels:
+        k8s-app: "$APPNAME"
+        role: "api"
+    spec:
+      containers:
+      - name: api
+        env:
+        - name: PORT
+          value: "3000"
+        - name: NODE_ENV
+          value: $ENVIRONMENT
+        - name: CONSOLELOG
+          value: "$CONSOLELOG"
+        - name: HOSTNAME
+          value: ""
+        - name: DEV_MODE
+          value: ""
+        - name: PROFILE_MODE
+          value: ""
+
+        image: $IMG_NAME
+        ports:
+        - containerPort: 3000
+          name: http
+          protocol: TCP
+        resources:
+          limits:
+            cpu: 500m
+            memory: 500M
+          requests:
+            cpu: 50m
+            memory: 100M
+      imagePullSecrets:
+      - name: gitlabdocker
+      restartPolicy: Always

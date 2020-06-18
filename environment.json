@@ -1,0 +1,12 @@
+{
+    "development": {
+        "SERVER_URL": "http://localhost:8080",
+        "PORT": 8080,
+        "FULLFILMENT_URL": "http://fulfilment.postventa/billings?order-id="
+    },
+    "production": {
+        "SERVER_URL": "https://micuenta.fravega.com:80",
+        "PORT": 80,
+        "FULLFILMENT_URL": "http://fulfilment.postventa/billings?order-id="
+    }
+}
